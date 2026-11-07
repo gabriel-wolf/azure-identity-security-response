@@ -1,0 +1,568 @@
+{
+  "metadata": {
+    "notes": {}
+  },
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "HTTP_Request": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "GET",
+                "PATCH"
+              ]
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "Disable",
+                "DisableReset",
+                "Enable",
+                "None"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "reference": {
+              "type": "string"
+            },
+            "serviceNowTarget": {
+              "type": "string",
+              "enum": [
+                "production",
+                "test"
+              ]
+            }
+          },
+          "required": [
+            "username",
+            "method"
+          ]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Main_Workflow": {
+      "actions": {
+        "Get_Identity_Secret": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['keyvault']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/secrets/@{encodeURIComponent('Identity')}/value"
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          }
+        },
+        "Method": {
+          "runAfter": {
+            "Get_Identity_Secret": [
+              "Succeeded"
+            ]
+          },
+          "cases": {
+            "GET": {
+              "case": "get",
+              "actions": {
+                "GET_Response": {
+                  "runAfter": {
+                    "GET_Identity_": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  },
+                  "type": "Response",
+                  "kind": "Http",
+                  "inputs": {
+                    "statusCode": "@outputs('GET_Identity_')?['statusCode']",
+                    "body": "@body('GET_Identity_')"
+                  }
+                },
+                "GET_Identity_": {
+                  "type": "Http",
+                  "inputs": {
+                    "uri": "https://identity.example.invalid/identity/user/@{triggerBody()?['username']}/Account",
+                    "method": "@triggerBody()?['method']",
+                    "headers": {
+                      "accept": "application/json",
+                      "X-TOKEN": "@{body('Get_Identity_Secret')?['value']}",
+                      "Content-Type": "application/json"
+                    }
+                  },
+                  "runtimeConfiguration": {
+                    "contentTransfer": {
+                      "transferMode": "Chunked"
+                    }
+                  }
+                },
+                "GET_Success": {
+                  "runAfter": {
+                    "GET_Response": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  }
+                }
+              }
+            },
+            "PATCH": {
+              "case": "patch",
+              "actions": {
+                "Status_Code": {
+                  "runAfter": {
+                    "PATCH_Identity": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  },
+                  "cases": {
+                    "200": {
+                      "case": 200,
+                      "actions": {
+                        "Disable": {
+                          "actions": {
+                            "Get_ServiceNow_Secret": {
+                              "type": "ApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "connection": {
+                                    "name": "@parameters('$connections')['keyvault']['connectionId']"
+                                  }
+                                },
+                                "method": "get",
+                                "path": "/secrets/@{encodeURIComponent('ServiceNow')}/value"
+                              },
+                              "runtimeConfiguration": {
+                                "secureData": {
+                                  "properties": [
+                                    "inputs",
+                                    "outputs"
+                                  ]
+                                }
+                              }
+                            },
+                            "ServiceNow_Target": {
+                              "runAfter": {
+                                "Get_ServiceNow_Secret": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "cases": {
+                                "PRODUCTION": {
+                                  "case": "production",
+                                  "actions": {
+                                    "PROD_ServiceNow": {
+                                      "type": "Http",
+                                      "inputs": {
+                                        "uri": "https://servicenow.example.invalid/api/sn_sc/servicecatalog/items/EXAMPLE_CATALOG_ITEM_ID/order_now",
+                                        "method": "POST",
+                                        "headers": {
+                                          "Accept": "application/json",
+                                          "Content-Type": "application/json"
+                                        },
+                                        "body": {
+                                          "sysparm_quantity": "1",
+                                          "variables": {
+                                            "user_name": "@{triggerBody()?['username']}",
+                                            "description": "@{triggerBody()?['description']}",
+                                            "reference": "@{triggerBody()?['reference']}"
+                                          }
+                                        },
+                                        "authentication": {
+                                          "type": "Basic",
+                                          "username": "example-service-account",
+                                          "password": "@{body('Get_ServiceNow_Secret')?['value']}"
+                                        }
+                                      },
+                                      "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                          "transferMode": "Chunked"
+                                        }
+                                      }
+                                    },
+                                    "PROD_Response": {
+                                      "runAfter": {
+                                        "PROD_ServiceNow": [
+                                          "Succeeded",
+                                          "Failed"
+                                        ]
+                                      },
+                                      "type": "Response",
+                                      "kind": "Http",
+                                      "inputs": {
+                                        "statusCode": "@outputs('PATCH_Identity')?['statusCode']",
+                                        "body": {
+                                          "Identity": "@body('PATCH_Identity')",
+                                          "serviceNow": "@body('PROD_ServiceNow')"
+                                        }
+                                      }
+                                    },
+                                    "Prod_Success": {
+                                      "runAfter": {
+                                        "PROD_Response": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "type": "Terminate",
+                                      "inputs": {
+                                        "runStatus": "Succeeded"
+                                      }
+                                    }
+                                  }
+                                },
+                                "TEST": {
+                                  "case": "test",
+                                  "actions": {
+                                    "TEST_ServiceNow": {
+                                      "type": "Http",
+                                      "inputs": {
+                                        "uri": "https://servicenow-test.example.invalid/api/sn_sc/servicecatalog/items/EXAMPLE_CATALOG_ITEM_ID/order_now",
+                                        "method": "POST",
+                                        "headers": {
+                                          "Accept": "application/json",
+                                          "Content-Type": "application/json"
+                                        },
+                                        "body": {
+                                          "sysparm_quantity": "1",
+                                          "variables": {
+                                            "user_name": "@{triggerBody()?['username']}",
+                                            "description": "@{triggerBody()?['description']}",
+                                            "reference": "@{triggerBody()?['reference']}"
+                                          }
+                                        },
+                                        "authentication": {
+                                          "type": "Basic",
+                                          "username": "example-service-account",
+                                          "password": "@{body('Get_ServiceNow_Secret')?['value']}"
+                                        }
+                                      },
+                                      "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                          "transferMode": "Chunked"
+                                        }
+                                      }
+                                    },
+                                    "TEST_Response": {
+                                      "runAfter": {
+                                        "TEST_ServiceNow": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "type": "Response",
+                                      "kind": "Http",
+                                      "inputs": {
+                                        "statusCode": "@outputs('PATCH_Identity')?['statusCode']",
+                                        "body": {
+                                          "Identity": "@body('PATCH_Identity')",
+                                          "serviceNow": "@body('TEST_ServiceNow')"
+                                        }
+                                      }
+                                    },
+                                    "Test_Success": {
+                                      "runAfter": {
+                                        "TEST_Response": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "type": "Terminate",
+                                      "inputs": {
+                                        "runStatus": "Succeeded"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "default": {
+                                "actions": {
+                                  "FAIL_ServiceNowTarget": {
+                                    "type": "Response",
+                                    "kind": "Http",
+                                    "inputs": {
+                                      "statusCode": 400,
+                                      "body": {
+                                        "error": "Invalid ServiceNow Target. Supported targets are production and test.",
+                                        "runId": "@{workflow()?['run']?['name']}"
+                                      }
+                                    }
+                                  },
+                                  "Bad_ServiceNowTarget": {
+                                    "runAfter": {
+                                      "FAIL_ServiceNowTarget": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "type": "Terminate",
+                                    "inputs": {
+                                      "runStatus": "Failed",
+                                      "runError": {
+                                        "code": "400",
+                                        "message": "Invalid ServiceNow Target. Supported targets are production and test."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "expression": "@toLower(triggerBody()?['serviceNowTarget'])",
+                              "type": "Switch"
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "ENABLE_Response": {
+                                "type": "Response",
+                                "kind": "Http",
+                                "inputs": {
+                                  "statusCode": "@outputs('PATCH_Identity')?['statusCode']",
+                                  "body": "@body('PATCH_Identity')"
+                                }
+                              },
+                              "Enable_Success": {
+                                "runAfter": {
+                                  "ENABLE_Response": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "type": "Terminate",
+                                "inputs": {
+                                  "runStatus": "Succeeded"
+                                }
+                              }
+                            }
+                          },
+                          "expression": {
+                            "or": [
+                              {
+                                "equals": [
+                                  "@toLower(triggerBody()?['action'])",
+                                  "disable"
+                                ]
+                              },
+                              {
+                                "equals": [
+                                  "@toLower(triggerBody()?['action'])",
+                                  "disablereset"
+                                ]
+                              }
+                            ]
+                          },
+                          "type": "If"
+                        }
+                      }
+                    }
+                  },
+                  "default": {
+                    "actions": {
+                      "DEFAULT_Status_Code": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "inputs": {
+                          "statusCode": "@outputs('PATCH_Identity')?['statusCode']",
+                          "body": "@body('PATCH_Identity')"
+                        }
+                      },
+                      "Default_Success": {
+                        "runAfter": {
+                          "DEFAULT_Status_Code": [
+                            "Succeeded"
+                          ]
+                        },
+                        "type": "Terminate",
+                        "inputs": {
+                          "runStatus": "Succeeded"
+                        }
+                      }
+                    }
+                  },
+                  "expression": "@outputs('PATCH_Identity')?['statusCode']",
+                  "type": "Switch"
+                },
+                "PATCH_Identity": {
+                  "runAfter": {
+                    "Check_Valid_Action": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Http",
+                  "inputs": {
+                    "uri": "https://identity.example.invalid/identity/user/@{triggerBody()?['username']}/Account",
+                    "method": "@triggerBody()?['method']",
+                    "headers": {
+                      "accept": "application/json",
+                      "X-TOKEN": "@{body('Get_Identity_Secret')?['value']}",
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "action": "@{triggerBody()?['action']}"
+                    }
+                  },
+                  "runtimeConfiguration": {
+                    "contentTransfer": {
+                      "transferMode": "Chunked"
+                    }
+                  }
+                },
+                "Check_Valid_Action": {
+                  "actions": {},
+                  "runAfter": {
+                    "Valid_Action": [
+                      "Succeeded"
+                    ]
+                  },
+                  "else": {
+                    "actions": {
+                      "FAIL_Action": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "inputs": {
+                          "statusCode": 400,
+                          "body": {
+                            "error": "Invalid action. Supported methods are Disable, DisableReset, and Enable",
+                            "runId": "@{workflow()?['run']?['name']}"
+                          }
+                        }
+                      },
+                      "Invalid_Action": {
+                        "runAfter": {
+                          "FAIL_Action": [
+                            "Succeeded"
+                          ]
+                        },
+                        "type": "Terminate",
+                        "inputs": {
+                          "runStatus": "Failed",
+                          "runError": {
+                            "code": "400",
+                            "message": "Invalid action. Supported methods are Disable, DisableReset, and Enable"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@outputs('Valid_Action')",
+                          true
+                        ]
+                      }
+                    ]
+                  },
+                  "type": "If"
+                },
+                "Valid_Action": {
+                  "type": "Compose",
+                  "inputs": "@\nor(\n    equals(triggerBody()?['method'], 'GET'),\n    and(\n        equals(triggerBody()?['method'], 'PATCH'),\n        contains(\n            createArray('Disable', 'DisableReset', 'Enable'),\n            triggerBody()?['action']\n        )\n    )\n)\n"
+                }
+              }
+            }
+          },
+          "default": {
+            "actions": {
+              "FAIL_Method": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                  "statusCode": 400,
+                  "body": {
+                    "error": "Invalid method. Supported methods are GET and PATCH.",
+                    "runId": "@{workflow()?['run']?['name']}"
+                  }
+                }
+              },
+              "Invalid_Method": {
+                "runAfter": {
+                  "FAIL_Method": [
+                    "Succeeded"
+                  ]
+                },
+                "type": "Terminate",
+                "inputs": {
+                  "runStatus": "Failed",
+                  "runError": {
+                    "code": "400",
+                    "message": "Invalid method. Supported methods are GET and PATCH."
+                  }
+                }
+              }
+            }
+          },
+          "expression": "@toLower(triggerBody()?['method'])",
+          "type": "Switch"
+        }
+      },
+      "runAfter": {},
+      "type": "Scope"
+    },
+    "Handle_Errors": {
+      "actions": {
+        "FAIL_Generic": {
+          "type": "Response",
+          "kind": "Http",
+          "inputs": {
+            "statusCode": 400,
+            "body": {
+              "error": "Internal workflow error",
+              "runId": "@{workflow()?['run']?['name']}"
+            }
+          }
+        },
+        "Generic": {
+          "runAfter": {
+            "FAIL_Generic": [
+              "Succeeded"
+            ]
+          },
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "400",
+              "message": "Internal workflow error"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Main_Workflow": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "Scope"
+    }
+  },
+  "outputs": {}
+}

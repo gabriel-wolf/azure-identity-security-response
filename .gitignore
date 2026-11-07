@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+*.log
+deployment_timestamp.txt
+.DS_Store
+Thumbs.db

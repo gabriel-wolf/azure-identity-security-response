@@ -1,0 +1,51 @@
+{
+  "purpose": "Sanitized architecture excerpts only; not an ARM template or deployable APIM configuration.",
+  "api": {
+    "displayName": "Identity Response",
+    "path": "identity-response",
+    "subscriptionRequired": true,
+    "protocols": [
+      "https"
+    ]
+  },
+  "operations": [
+    {
+      "displayName": "Get User",
+      "method": "POST",
+      "urlTemplate": "/get",
+      "body": {
+        "username": "example.user",
+        "method": "GET"
+      }
+    },
+    {
+      "displayName": "Modify User",
+      "method": "POST",
+      "urlTemplate": "/patch",
+      "body": {
+        "username": "example.user",
+        "method": "PATCH",
+        "action": "DisableReset",
+        "description": "Identity security response",
+        "reference": "Identity Response Platform",
+        "serviceNowTarget": "production"
+      }
+    }
+  ],
+  "backend": {
+    "id": "identity-response-backend",
+    "url": "https://workflow.example.invalid/workflows/EXAMPLE_WORKFLOW_ID/triggers"
+  },
+  "product": {
+    "id": "identity-app-user-account-manager",
+    "subscriptionRequired": true,
+    "api": "identity-response"
+  },
+  "policies": {
+    "callerValidationFragment": "<!-- Validates the caller's Microsoft Entra token and requires a specific Object ID (oid).\r\n     The permitted identity is supplied by the API or Product policy. -->\r\n<fragment>\r\n\t<validate-azure-ad-token tenant-id=\"EXAMPLE_TENANT_ID\" header-name=\"Authorization\" failed-validation-httpcode=\"401\" failed-validation-error-message=\"Unauthorized\">\r\n\t\t<audiences>\r\n\t\t\t<audience>api://EXAMPLE_API_APPLICATION_ID</audience>\r\n\t\t</audiences>\r\n\t\t<required-claims>\r\n\t\t\t<claim name=\"oid\" match=\"any\">\r\n\t\t\t\t<value>@(context.Variables.GetValueOrDefault&lt;string&gt;(\"allowedCallerObjectId\", \"\"))</value>\r\n\t\t\t</claim>\r\n\t\t</required-claims>\r\n\t</validate-azure-ad-token>\r\n\t<set-header name=\"Authorization\" exists-action=\"delete\" />\r\n</fragment>",
+    "applicationProduct": "<policies>\r\n  <inbound>\r\n    <base />\r\n    <set-variable name=\"allowedCallerObjectId\" value=\"EXAMPLE_CALLER_OBJECT_ID\" />\r\n    <include-fragment fragment-id=\"identity-entra-allowed-identity\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>",
+    "api": "<policies>\r\n  <inbound>\r\n    <base />\r\n    <set-backend-service id=\"apim-generated-policy\" backend-id=\"identity-response-backend\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>",
+    "getOperation": "<policies>\r\n  <inbound>\r\n    <base />\r\n    <choose>\r\n      <when condition=\"@((string)context.Request.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;method&quot;] != &quot;GET&quot;)\">\r\n        <return-response>\r\n          <set-status code=\"400\" reason=\"Invalid Method\" />\r\n          <set-body>{\"error\":\"This endpoint only allows GET.\"}</set-body>\r\n        </return-response>\r\n      </when>\r\n    </choose>\r\n    <set-method id=\"apim-generated-policy\">POST</set-method>\r\n    <rewrite-uri template=\"/HTTP_Request/paths/invoke?api-version=2016-06-01\" />\r\n    <set-header name=\"Ocp-Apim-Subscription-Key\" exists-action=\"delete\" />\r\n    <authentication-managed-identity resource=\"api://EXAMPLE_API_APPLICATION_ID\" ignore-error=\"false\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>",
+    "modifyOperation": "<policies>\r\n  <inbound>\r\n    <base />\r\n    <choose>\r\n      <when condition=\"@{&#xA;                var body = context.Request.Body.As&lt;JObject&gt;(preserveContent: true);&#xA;                var method = (string)body[&quot;method&quot;];&#xA;                var action = (string)body[&quot;action&quot;];&#xA;&#xA;                return method != &quot;PATCH&quot; ||&#xA;                    (action != &quot;Disable&quot; &amp;&amp;&#xA;                     action != &quot;DisableReset&quot; &amp;&amp;&#xA;                     action != &quot;Enable&quot;);&#xA;            }\">\r\n        <return-response>\r\n          <set-status code=\"400\" reason=\"Invalid Method\" />\r\n          <set-body>{\"error\":\"This endpoint only allows PATCH with Disable, DisableReset, or Enable.\"}</set-body>\r\n        </return-response>\r\n      </when>\r\n    </choose>\r\n    <set-method id=\"apim-generated-policy\">POST</set-method>\r\n    <rewrite-uri template=\"/HTTP_Request/paths/invoke?api-version=2016-06-01\" />\r\n    <set-header name=\"Ocp-Apim-Subscription-Key\" exists-action=\"delete\" />\r\n    <authentication-managed-identity resource=\"api://EXAMPLE_API_APPLICATION_ID\" ignore-error=\"false\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>"
+  }
+}

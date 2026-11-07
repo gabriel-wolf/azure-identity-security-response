@@ -1,0 +1,808 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Identity Security Response Platform</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+    <header>
+        <h1>
+            <a href="/" class="header-home">
+                Azure Identity Security Response Platform
+            </a>
+        </h1>
+        <p>SOC Account Lookup and Response Tool</p>
+    </header>
+
+    <main class="container">
+
+        <!-- ACCOUNT LOOKUP -->
+        <div class="card">
+            <h2>Lookup User</h2>
+
+            <form
+                id="lookup-form"
+                method="post"
+                action="/lookup"
+            >
+                <div class="search-row">
+                    <input
+                        id="username-input"
+                        type="text"
+                        name="username"
+                        placeholder="Enter username or email"
+                        value="{{ user.username if user else '' }}"
+                        required
+                    >
+
+                    <button
+                        id="search-button"
+                        type="submit"
+                        class="search-button"
+                    >
+                        Search
+                    </button>
+                </div>
+
+                <div
+                    id="loading-area"
+                    class="loading-area"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div class="loading-text">
+                        Searching account
+
+                        <span
+                            class="loading-dots"
+                            aria-hidden="true"
+                        >
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </span>
+                    </div>
+
+                    <div class="progress-track">
+                        <div class="progress-bar"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- LOOKUP ERROR -->
+        {% if error %}
+        <div class="error-message" role="alert">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- USER DETAILS -->
+        {% if user %}
+        <div class="card">
+
+            <h2>User Details</h2>
+
+            <!-- VIP NOTICE -->
+            {% if user.is_vip == true %}
+            <div class="vip-warning" role="alert">
+                <h2>⚠ VIP ACCOUNT DETECTED</h2>
+                <p>
+                    This user has a protected job title.
+                    Follow VIP account procedures before
+                    taking any action.
+                </p>
+                <strong>Matched VIP Title:</strong>
+                {{ user.vip_matches | join(", ") }}
+            </div>
+
+            {% elif user.is_vip is none %}
+            <div class="vip-warning" role="alert">
+                <h2>⚠ VIP STATUS UNVERIFIED</h2>
+                <p>
+                    The user's job title is unavailable.
+                    Verify VIP status before taking action.
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- USER INFORMATION -->
+            <div class="field">
+                <div class="label">Username</div>
+                <div class="value">
+                    {{ user.username }}
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="label">Full Name</div>
+                <div class="value">
+                    {{ user.display_name or "Not available" }}
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="label">Department</div>
+                <div class="value">
+                    {{ user.department or "Not available" }}
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="label">Job Title</div>
+                <div class="value">
+                    {{ user.job_title or "Not available" }}
+                </div>
+            </div>
+
+            <!-- ACCOUNT STATUS -->
+            <div class="field">
+                <div class="label">Account Status</div>
+
+                <div class="value" id="status-container">
+                    {% if user.status == "ACTIVE" %}
+                    <span class="status status-enabled">
+                        ACTIVE
+                    </span>
+
+                    {% elif user.status == "DISABLED" %}
+                    <span class="status status-disabled">
+                        DISABLED
+                    </span>
+
+                    {% else %}
+                    <span class="status status-unknown">
+                        UNKNOWN
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if user.status == "DISABLED"
+                  and user.disabled_date %}
+            <div class="field">
+                <div class="label">Disabled Date</div>
+                <div class="value">
+                    {{ user.disabled_date }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if user.pwd_last_set %}
+            <div class="field">
+                <div class="label">Password Last Set</div>
+                <div class="value">
+                    {{ user.pwd_last_set }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- ACCOUNT ACTIONS -->
+            <div class="actions">
+                <h3>Account Actions</h3>
+
+                <!-- SERVICENOW TEST MODE -->
+                <div class="servicenow-mode">
+                    <strong>ServiceNow Test Mode</strong>
+
+                    <label class="mode-switch">
+                        <input
+                            type="checkbox"
+                            id="servicenow-test-mode"
+                            aria-label="ServiceNow Test Mode"
+                        >
+                        <span class="mode-slider"></span>
+                    </label>
+                </div>
+
+                <p>ServiceNow Test Mode changes ticket routing only.
+                    Account enable and disable actions still execute.</p>
+
+                <!-- ACTION BUTTONS -->
+                <div class="action-row">
+
+                    <button
+                        type="button"
+                        id="disable-button"
+                        class="action-disable"
+                        onclick="performAction('disable_reset')"
+                    >
+                        Disable
+                    </button>
+
+                    <button
+                        type="button"
+                        id="enable-button"
+                        class="action-enable"
+                        onclick="performAction('enable')"
+                    >
+                        Enable
+                    </button>
+
+                    <!-- MORE ACTIONS -->
+                    <div class="action-menu">
+                        <button
+                            type="button"
+                            id="menu-trigger"
+                            class="menu-trigger"
+                            aria-label="More account actions"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            onclick="toggleActionMenu()"
+                        >
+                            &#8942;
+                        </button>
+
+                        <div
+                            id="menu-panel"
+                            class="menu-panel"
+                            hidden
+                        >
+                            <button
+                                type="button"
+                                id="disable-no-reset-button"
+                                onclick="performAction('disable_no_reset')"
+                            >
+                                Disable (No Reset)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="action-hint">
+                    Disable performs DisableReset.
+                    The three-dot menu provides
+                    Disable without reset.
+                </p>
+
+                <!-- ACTION PROGRESS AND DIAGNOSTICS -->
+                <div
+                    id="action-progress"
+                    class="action-progress"
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                >
+                    <h4 id="action-heading">
+                        Account action
+                    </h4>
+
+                    <div
+                        id="action-progress-bar"
+                        class="progress-track"
+                        hidden
+                    >
+                        <div class="progress-bar"></div>
+                    </div>
+
+                    <div
+                        id="action-log"
+                        class="action-log"
+                    ></div>
+
+                    <div
+                        id="action-result"
+                        class="action-result"
+                        hidden
+                    ></div>
+
+                    <!-- API REQUEST AND RESPONSE -->
+                    <details
+                        id="action-response"
+                        class="action-response"
+                        hidden
+                    >
+                        <summary>
+                            API Request &amp; Response
+                        </summary>
+
+                        <pre id="action-response-body"></pre>
+                    </details>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- API DEBUG DETAILS -->
+        {% if debug_enabled %}
+        <div class="card debug-card">
+            <details class="debug-panel">
+                <summary>API Debug Details</summary>
+
+                <div class="debug-content">
+                    {% if debug is defined and debug %}
+
+                    <h3>HTTP Request</h3>
+
+                    <div class="debug-meta">
+                        <span class="debug-tag">
+                            {{ debug.request.method }}
+                        </span>
+                    </div>
+
+                    <div class="debug-url">
+                        {{ debug.request.url }}
+                    </div>
+
+                    <pre>{{ debug.request.body | tojson(indent=2) }}</pre>
+
+                    <h3>HTTP Response</h3>
+
+                    <div class="debug-meta">
+                        {% if debug.response.status_code < 400 %}
+                        <span class="debug-tag success">
+                            HTTP {{ debug.response.status_code }}
+                        </span>
+                        {% else %}
+                        <span class="debug-tag error">
+                            HTTP {{ debug.response.status_code }}
+                        </span>
+                        {% endif %}
+
+                        <span class="debug-tag">
+                            {{ debug.response.elapsed_ms }} ms
+                        </span>
+                    </div>
+
+                    <pre>{{ debug.response.body | tojson(indent=2) }}</pre>
+
+                    {% else %}
+                    <p class="debug-note">
+                        No API request/response data available.
+                        Search for an account to capture a request.
+                    </p>
+                    {% endif %}
+                </div>
+            </details>
+        </div>
+        {% endif %}
+
+    </main>
+
+    <!-- FIXED FOOTER -->
+    <footer>
+        <div class="footer-inner">
+            <span>Azure Identity Security Response Platform</span>
+
+            <span class="footer-deployment">
+                Last app startup: {{ deployment_time }}
+            </span>
+        </div>
+    </footer>
+
+    <script>
+        const lookupForm = document.getElementById(
+            "lookup-form"
+        );
+
+        const searchButton = document.getElementById(
+            "search-button"
+        );
+
+        const loadingArea = document.getElementById(
+            "loading-area"
+        );
+
+        const csrfToken = {{ csrf_token | tojson }};
+
+        const accountUsername = {{
+            (user.username if user else "") | tojson
+        }};
+
+        const serviceNowToggle = document.getElementById(
+            "servicenow-test-mode"
+        );
+
+        // SEARCH LOADING
+        if (lookupForm) {
+            lookupForm.addEventListener(
+                "submit",
+                function () {
+                    if (!lookupForm.checkValidity()) {
+                        return;
+                    }
+
+                    searchButton.disabled = true;
+                    searchButton.textContent = "Searching...";
+                    loadingArea.classList.add("visible");
+                }
+            );
+
+            window.addEventListener(
+                "pageshow",
+                function () {
+                    searchButton.disabled = false;
+                    searchButton.textContent = "Search";
+                    loadingArea.classList.remove("visible");
+                }
+            );
+        }
+
+        let actionRunning = false;
+
+        const actionLabels = {
+            disable_reset: "Disable",
+            enable: "Enable",
+            disable_no_reset: "Disable (No Reset)"
+        };
+
+        const methodLabels = {
+            disable_reset: "DisableReset",
+            enable: "Enable",
+            disable_no_reset: "Disable"
+        };
+
+        function getServiceNowTarget() {
+            return (
+                serviceNowToggle &&
+                serviceNowToggle.checked
+            ) ? "test" : "production";
+        }
+
+        // THREE-DOT MENU
+        function toggleActionMenu() {
+            if (actionRunning) {
+                return;
+            }
+
+            const panel = document.getElementById(
+                "menu-panel"
+            );
+
+            const trigger = document.getElementById(
+                "menu-trigger"
+            );
+
+            if (!panel || !trigger) {
+                return;
+            }
+
+            panel.hidden = !panel.hidden;
+
+            trigger.setAttribute(
+                "aria-expanded",
+                String(!panel.hidden)
+            );
+        }
+
+        document.addEventListener(
+            "click",
+            function (event) {
+                const menu = document.querySelector(
+                    ".action-menu"
+                );
+
+                if (!menu || menu.contains(event.target)) {
+                    return;
+                }
+
+                const panel = document.getElementById(
+                    "menu-panel"
+                );
+
+                const trigger = document.getElementById(
+                    "menu-trigger"
+                );
+
+                if (panel && trigger) {
+                    panel.hidden = true;
+                    trigger.setAttribute(
+                        "aria-expanded",
+                        "false"
+                    );
+                }
+            }
+        );
+
+        function setActionButtonsDisabled(disabled) {
+            [
+                "disable-button",
+                "enable-button",
+                "menu-trigger",
+                "disable-no-reset-button"
+            ].forEach(function (id) {
+                const button = document.getElementById(id);
+
+                if (button) {
+                    button.disabled = disabled;
+                }
+            });
+
+            if (serviceNowToggle) {
+                serviceNowToggle.disabled = disabled;
+            }
+        }
+
+        // ACTION LOGGING
+        function appendActionLog(message) {
+            const log = document.getElementById(
+                "action-log"
+            );
+
+            const timestamp = new Date().toLocaleTimeString();
+
+            log.textContent +=
+                "[" + timestamp + "] " +
+                message + "\n";
+        }
+
+        function showActionResult(message, kind) {
+            const box = document.getElementById(
+                "action-result"
+            );
+
+            box.hidden = false;
+            box.className = "action-result " + kind;
+            box.textContent = message;
+        }
+
+        // UPDATE STATUS BADGE
+        function updateStatus(status) {
+            if (!status) {
+                return;
+            }
+
+            const container = document.getElementById(
+                "status-container"
+            );
+
+            if (!container) {
+                return;
+            }
+
+            const badge = document.createElement("span");
+            badge.className = "status";
+
+            if (status === "ACTIVE") {
+                badge.classList.add("status-enabled");
+            } else if (status === "DISABLED") {
+                badge.classList.add("status-disabled");
+            } else {
+                badge.classList.add("status-unknown");
+            }
+
+            badge.textContent = status;
+            container.replaceChildren(badge);
+        }
+
+        // PERFORM ACCOUNT ACTION
+        async function performAction(action) {
+            if (actionRunning || !accountUsername) {
+                return;
+            }
+
+            const label = actionLabels[action];
+            const method = methodLabels[action];
+
+            if (!label || !method) {
+                return;
+            }
+
+            const serviceNowTarget = getServiceNowTarget();
+
+            actionRunning = true;
+            setActionButtonsDisabled(true);
+
+            // Close action menu.
+            const menu = document.getElementById(
+                "menu-panel"
+            );
+
+            const menuTrigger = document.getElementById(
+                "menu-trigger"
+            );
+
+            menu.hidden = true;
+            menuTrigger.setAttribute(
+                "aria-expanded",
+                "false"
+            );
+
+            const panel = document.getElementById(
+                "action-progress"
+            );
+
+            const progressBar = document.getElementById(
+                "action-progress-bar"
+            );
+
+            const resultBox = document.getElementById(
+                "action-result"
+            );
+
+            const responseDetails = document.getElementById(
+                "action-response"
+            );
+
+            const responseBody = document.getElementById(
+                "action-response-body"
+            );
+
+            document.getElementById(
+                "action-heading"
+            ).textContent = label + " — In Progress";
+
+            panel.hidden = false;
+            progressBar.hidden = false;
+            resultBox.hidden = true;
+            responseDetails.hidden = true;
+
+            document.getElementById(
+                "action-log"
+            ).textContent = "";
+
+            appendActionLog(
+                "Preparing " + method +
+                " request for " + accountUsername
+            );
+
+            appendActionLog(
+                "ServiceNow target: " +
+                serviceNowTarget.toUpperCase()
+            );
+
+            appendActionLog(
+                "Sending request to application backend..."
+            );
+
+            try {
+                const response = await fetch(
+                    "/account-action",
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-Token": csrfToken
+                        },
+                        body: JSON.stringify({
+                            username: accountUsername,
+                            action: action,
+                            serviceNowTarget: serviceNowTarget
+                        })
+                    }
+                );
+
+                appendActionLog(
+                    "Application response received: HTTP " +
+                    response.status
+                );
+
+                const rawText = await response.text();
+
+                let data;
+
+                try {
+                    data = JSON.parse(rawText);
+                } catch {
+                    throw new Error(
+                        "Application returned a non-JSON response."
+                    );
+                }
+
+                // DISPLAY REQUEST AND RESPONSE DETAILS
+                const diagnosticDetails = {
+                    request: data.request_details || {
+                        note: (
+                            "Request details not available. " +
+                            "The action may have been rejected " +
+                            "before contacting APIM."
+                        )
+                    },
+                    response: {
+                        application_http_status: response.status,
+                        upstream_http_status:
+                            data.upstream_status ?? null,
+                        application_result: data
+                    }
+                };
+
+                responseBody.textContent = JSON.stringify(
+                    diagnosticDetails,
+                    null,
+                    2
+                );
+
+                responseDetails.hidden = false;
+
+                if (!response.ok || !data.ok) {
+                    appendActionLog(
+                        "Action failed or was blocked."
+                    );
+
+                    showActionResult(
+                        data.message || "Account action failed.",
+                        "error"
+                    );
+
+                    document.getElementById(
+                        "action-heading"
+                    ).textContent = label + " — Failed";
+
+                    return;
+                }
+
+                appendActionLog(
+                    "APIM returned a successful response."
+                );
+
+                appendActionLog(
+                    "ServiceNow target used: " +
+                    (
+                        data.service_now_target ||
+                        serviceNowTarget
+                    ).toUpperCase()
+                );
+
+                const verification = data.verification;
+
+                if (verification && verification.verified) {
+                    appendActionLog(
+                        "Identity confirmed status: " +
+                        verification.status
+                    );
+
+                    updateStatus(verification.status);
+
+                    showActionResult(
+                        "Account status verified: " +
+                        verification.status +
+                        ". Search again to refresh dates.",
+                        "success"
+                    );
+
+                    document.getElementById(
+                        "action-heading"
+                    ).textContent = label + " — Verified";
+
+                } else {
+                    appendActionLog(
+                        verification
+                            ? verification.message
+                            : "Account status not yet verified."
+                    );
+
+                    showActionResult(
+                        "APIM responded successfully, but " +
+                        "the resulting account state is not " +
+                        "yet confirmed. Verify the account " +
+                        "status before retrying.",
+                        "warning"
+                    );
+
+                    document.getElementById(
+                        "action-heading"
+                    ).textContent =
+                        label + " — Verification Pending";
+                }
+
+            } catch (error) {
+                appendActionLog(
+                    "Request error: " + error.message
+                );
+
+                showActionResult(
+                    "The request did not return a usable " +
+                    "response. Check account status before " +
+                    "retrying, because the backend may " +
+                    "have received the action.",
+                    "error"
+                );
+
+                document.getElementById(
+                    "action-heading"
+                ).textContent = label + " — Error";
+
+            } finally {
+                progressBar.hidden = true;
+                actionRunning = false;
+                setActionButtonsDisabled(false);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+
+fastapi
+uvicorn[standard]
+gunicorn
+jinja2
+python-multipart
+requests
+azure-identity

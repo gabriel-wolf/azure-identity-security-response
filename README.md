@@ -186,7 +186,7 @@ The available `action` values are `Enable`, `DisableReset`, and `Disable`; the S
 ### Account Remediation and Verification
 
 <p align="center">
-  <img src="imgs/disable.png" alt="Account remediation workflow and verified account state" width="620">
+  <img src="imgs/disable2.png" alt="Account remediation workflow and verified account state" width="620">
 </p>
 
 Following a successful API response, the Python application performs a new identity lookup and compares the returned state with the expected result. An HTTP acknowledgment and a verified account change are represented separately, making the authoritative account state the basis of the completion indicator.

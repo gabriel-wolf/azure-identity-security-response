@@ -256,7 +256,3 @@ apim/
 The APIM file intentionally omits unrelated APIs, alternate integrations, subscriptions, administrative groups, network allowlists, and service provisioning metadata. The Logic App file retains the workflow definition while omitting the ARM deployment wrapper, connection bindings, access-key resources, and exported network addresses.
 
 Unused client helpers for a separate VIP workflow were removed; the documented web application blocks VIP disable actions. Names and configuration keys are generic throughout the public source. The APIM policy excerpts also normalize an extra XML-escaping layer present in two exported expressions.
-
-`web-app/.env.example` documents configuration names and placeholder values. The application does not load that file automatically. The startup script records an application-start timestamp; the displayed timestamp is not independent proof of a deployment event.
-
-Screenshots will be added under `/imgs/`. Commented insertion points are included above without introducing broken image links. Screenshots should use synthetic account data and conceal environment identifiers, URLs, and diagnostics containing real identity information.

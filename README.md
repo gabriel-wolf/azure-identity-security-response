@@ -1,148 +1,172 @@
 # Azure Identity Security Response Platform
 
 ![Status](https://img.shields.io/badge/Status-In_Production-success)
-![Platform](https://img.shields.io/badge/Platform-Azure_App_Service-0078D4?style=flat&logo=microsoftazure&logoColor=white)
-![Azure Logic Apps](https://img.shields.io/badge/%20%20Azure%20Logic%20Apps-0078D4?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOCAxOCI+PHBhdGggZD0iTTEzLjg1MSw5LjA0N0gxMC45MzlBMS41MTgsMS41MTgsMCwwLDEsOS40MjEsNy41Mjl2LTMuMkg4LjU3OXYzLjJBMS41MTgsMS41MTgsMCwwLDEsNy4wNjEsOS4wNDdINC4xNDlhMS4yLDEuMiwwLDAsMC0xLjIsMS4ydjIuMzM4aC44NDFWMTAuMjQ0YS4zNTUuMzU1LDAsMCwxLC4zNTYtLjM1NUg3LjA2MUEyLjM1MywyLjM1MywwLDAsMCw4LjgsOS4xMjVhLjI3OC4yNzgsMCwwLDEsLjQwOCwwLDIuMzUzLDIuMzUzLDAsMCwwLDEuNzM1Ljc2NGgyLjkxNmEuMzU4LjM1NCwwLDAsMSwuMzU1LjM1NXYyLjMzOGguODQxVjEwLjI0NEExLjIsMS4yLDAsMCwwLDEzLjg1MSw5LjA0N1oiIGZpbGw9IiNmZmZmZmYiLz48cmVjdCB4PSI1LjYyNiIgeT0iLTAuMDIiIHdpZHRoPSI2Ljc0NyIgaGVpZ2h0PSI2Ljc0NyIgcng9IjAuNjA0IiBmaWxsPSIjZmZmZmZmIi8+PHJlY3QgeT0iMTEuMjczIiB3aWR0aD0iNi43NDciIGhlaWdodD0iNi43NDciIHJ4PSIwLjYwNCIgZmlsbD0iI2ZmZmZmZiIvPjxyZWN0IHg9IjExLjI1MyIgeT0iMTEuMjczIiB3aWR0aD0iNi43NDciIGhlaWdodD0iNi43NDciIHJ4PSIwLjYwNCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjkuMjczIDAuMDIpIHJvdGF0ZSg5MCkiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
+![Microsoft Azure](https://img.shields.io/badge/Microsoft_Azure-0078D4?style=flat&logo=microsoftazure&logoColor=white)
+![Azure Logic Apps](https://img.shields.io/badge/Azure_Logic_Apps-0078D4)
+![Microsoft Entra ID](https://img.shields.io/badge/Microsoft_Entra_ID-5E5E5E)
 
-Python-based enterprise identity security and incident response platform integrating Azure App Service, API Management, Logic Apps, and Microsoft Entra ID to centralize account investigation, automate remediation, and enforce VIP-aware safeguards.
+**A production Python-based identity security and incident response platform integrating Azure App Service, Azure API Management, Azure Logic Apps, Microsoft Entra ID, and ServiceNow.**
 
-The platform connects account investigation with controlled remediation. Analysts can resolve an enterprise identity, review its account state and organizational context, identify protected accounts, initiate supported account actions, and verify the resulting state from the identity system.
+Developed for security operations within a large enterprise, the platform unifies identity investigation, directory enrichment, VIP-aware account protections, automated remediation, and outcome verification in a single analyst interface. Its architecture connects a custom Python application to enterprise identity infrastructure through managed identities, a policy-controlled API gateway, and cloud-hosted orchestration.
 
----
+## Platform Capabilities
 
-## Overview
+| Capability | Implementation |
+| --- | --- |
+| **Centralized identity investigation** | Account lookup by username or email, authoritative account status, and relevant account timestamps |
+| **Directory intelligence** | Microsoft Graph enrichment with Microsoft Entra ID display name, department, and job title |
+| **Account remediation** | Enable, disable with reset, and disable without reset operations |
+| **Protected-account safeguards** | Configurable VIP detection with server-side revalidation and blocking of protected disable operations |
+| **Enterprise workflow integration** | Logic Apps orchestration, Azure Key Vault credential retrieval, and ServiceNow catalog activity |
+| **Response assurance** | Follow-up account-state verification, live execution feedback, and expandable API diagnostics |
 
-Identity response spans several systems: the authoritative account service, directory attributes, automation workflows, and service-management processes. Performing those steps independently makes it harder to apply consistent safeguards and distinguish a successful request from a completed account change.
+## Enterprise Architecture
 
-This platform brings those steps into one workflow while keeping their responsibilities separate. The enterprise identity service supplies account state, Microsoft Entra ID supplies directory context, and Azure-hosted automation performs the account operation and applicable ServiceNow activity.
-
-The web application supports:
-
-- Account lookup by username or email through the identity service.
-- Account status, password-last-set information, and applicable disable timestamps.
-- Display name, department, and job-title enrichment from Microsoft Graph.
-- Configurable VIP classification and server-side blocking of protected or unverified disable requests.
-- Enable, disable with reset, and disable without reset operations.
-- ServiceNow production or test routing.
-- Follow-up account-state verification and expandable request/response diagnostics.
-
-## Architecture
+The platform separates the analyst experience, application business logic, directory enrichment, API policy enforcement, workflow execution, and downstream account management. Python coordinates these services without placing identity-service credentials or Logic App endpoints in the browser.
 
 ```mermaid
 flowchart TD
-    Analyst[Security analyst] -->|Lookup or account action| Web[Azure App Service\nFastAPI and Jinja2]
-    Web -->|Managed identity token| Graph[Microsoft Graph\nEntra identity enrichment]
-    Web -->|HTTPS POST\nBearer token and subscription key| Gateway[Azure API Management]
-    Gateway -->|Policy validation and URL rewrite\nAPIM managed identity token| Workflow[Azure Logic Apps]
-    Workflow -->|Retrieve backend credentials| Vault[Azure Key Vault]
-    Workflow -->|GET or PATCH| Identity[Enterprise identity service]
-    Workflow -->|After successful disable\nProduction or test target| ServiceNow[ServiceNow catalog workflow]
-    Web -->|Follow-up lookup through APIM| Gateway
+    Analyst[Security Analyst] -->|Investigate and respond| App[Python / FastAPI / Jinja2<br/>Azure App Service]
+    App -->|Managed identity / Microsoft Graph| Entra[Microsoft Entra ID]
+    App -->|HTTPS / Bearer token / Subscription key| APIM[Azure API Management]
+    APIM -->|Policy validation / Managed identity| Logic[Azure Logic Apps]
+    Logic -->|Retrieve credentials| Vault[Azure Key Vault]
+    Logic -->|Identity lookup / account modification| Identity[Enterprise Identity Service]
+    Logic -->|Disable-related catalog workflow| SN[ServiceNow]
+    APIM -->|Account response| App
 ```
 
-| Component | Responsibility |
-| --- | --- |
-| Azure App Service | Hosts the analyst interface and Python application. |
-| FastAPI and Jinja2 | Handle lookup, server-side safeguards, account-action submission, and result presentation. |
-| Microsoft Graph / Entra ID | Enrich the resolved account with display name, department, and job title. |
-| Azure API Management | Provides the application-facing API boundary, caller validation, subscription requirements, and backend routing. |
-| Azure Logic Apps | Orchestrates identity-service calls, credential retrieval, response handling, and ServiceNow routing. |
-| Azure Key Vault | Supplies identity-service and ServiceNow credentials to the workflow. |
-| Enterprise identity service | Resolves the canonical username and performs authoritative account operations. |
-| ServiceNow | Receives catalog requests associated with successful disable actions. |
+**Python / FastAPI — Application and control layer.** The Azure App Service application implements identity resolution, Microsoft Graph integration, request validation, VIP safeguards, account-action orchestration, result interpretation, and state verification. Jinja2 and JavaScript provide the analyst-facing experience.
 
-APIM is a supporting component here and will receive a separate, dedicated writeup. This repository retains the integration details needed to understand the platform without reproducing the full gateway configuration.
+**Microsoft Entra ID — Organizational identity context.** Microsoft Graph supplies directory attributes associated with the canonical enterprise account, allowing the application to present organizational context and evaluate protected job titles.
 
-<!-- Future screenshot: /imgs/platform-overview.png -->
+**Azure API Management — Governed integration boundary.** APIM mediates application requests, applies gateway validation and subscription requirements, and authenticates to the downstream workflow with managed identity. APIM's broader architecture and policy design are documented separately.
+
+**Azure Logic Apps — Workflow execution.** Logic Apps handles request branching, Key Vault credential retrieval, enterprise identity operations, structured responses, and associated ServiceNow activity.
+
+**Enterprise identity service and ServiceNow — Operational systems.** The identity service supplies authoritative account state and performs account modifications. ServiceNow receives catalog activity associated with supported disable operations.
 
 ---
 
-## Account Investigation and Response
+## Python Application Engineering
 
-### 1. Resolve the authoritative identity
+The application is built with **Python and FastAPI**, with separate modules for APIM communication and Microsoft Graph queries. Rather than delegating all decisions to the automation workflow, the Python backend owns the account investigation flow, business-rule enforcement, action dispatch, and post-action verification.
 
-The application submits the analyst's username or email to the identity lookup endpoint through APIM. It requires a nonempty canonical username in the returned account data before continuing.
+The backend resolves a canonical account identifier before performing Entra enrichment, validates account-action requests on the server, and independently checks VIP status before sensitive disable actions. Its HTTP integration layer obtains managed-identity tokens and submits JSON requests to configured APIM endpoints; responses are evaluated before the interface reports an operation as verified.
 
-This resolution step matters because the directory enrichment and subsequent account operation should refer to the same identity, even when the initial search used an email address.
+The frontend uses **Jinja2, HTML, CSS, and JavaScript** to present account details, status indicators, protected-account warnings, action controls, live progress, and detailed API diagnostics.
 
 <details>
-<summary><strong>View the lookup request</strong></summary>
+<summary><strong>Python — Managed-identity API integration</strong></summary>
 
-From `web-app/identity_apim.py`:
+The following excerpt illustrates the application-to-APIM request pattern, with environment-specific values omitted.
 
 ```python
-return call_identity_api(
-    os.environ["IDENTITY_APIM_GET_URL"],
-    {
-        "username": username,
-        "method": "GET",
-    },
-    include_debug=include_debug,
-    http_method="POST",
-)
+from azure.identity import ManagedIdentityCredential
+import requests
+
+credential = ManagedIdentityCredential()
+
+def call_identity_api(url, payload, scope, subscription_key):
+    token = credential.get_token(scope).token
+    response = requests.post(
+        url,
+        json=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Ocp-Apim-Subscription-Key": subscription_key,
+            "Content-Type": "application/json",
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    return response.json()
 ```
 
-The HTTP request to APIM is POST. The JSON `method` field selects the logical operation performed downstream.
+The public example illustrates the authentication and transport pattern; the application implementation also handles response diagnostics and error propagation.
 
 </details>
 
-### 2. Enrich the account with Entra ID context
-
-The application obtains a Microsoft Graph token using its App Service managed identity. It searches for the canonical username using `onPremisesSamAccountName`, requests the identity attributes needed by the interface, and requires exactly one matching directory user.
-
-Display name, department, and job title are combined with the identity service's account status and timestamps. Missing or ambiguous directory results produce an error instead of silently attaching another user's attributes.
-
-The source contains no embedded Graph client secret. Managed identity authenticates the application; the actual Graph permission assignments are external to this repository.
-
-### 3. Classify and protect VIP accounts
-
-Protected job titles come from the `IDENTITY_VIP_TITLES` environment variable as a nonempty JSON list. Classification uses case-insensitive substring matching, so a configured title can match a longer job-title value.
-
-A match produces a VIP warning. A missing or empty job title produces an unverified classification. Before either disable operation, the backend independently resolves the account again, retrieves directory attributes, and reevaluates the classification.
-
 <details>
-<summary><strong>View the server-side disable safeguard</strong></summary>
-
-From `web-app/main.py`:
+<summary><strong>Python — Canonical identity lookup</strong></summary>
 
 ```python
-if action in (
-    "disable_reset",
-    "disable_no_reset",
-):
+result, debug = get_user_status(
+    username,
+    include_debug=DEBUG_UI,
+)
+
+canonical_username = normalize_eraider_result(result)
+entra_user = get_entra_user(canonical_username)
+
+user = {
+    "username": canonical_username,
+    "display_name": entra_user.get("display_name"),
+    "department": entra_user.get("department"),
+    "job_title": entra_user.get("job_title"),
+    "status": str(result.get("status") or "UNKNOWN").upper(),
+}
+```
+
+The canonical identity returned by the authoritative account system is reused for directory enrichment and account actions, even when the initial search uses an email address.
+
+</details>
+
+## Identity Investigation and Directory Enrichment
+
+A search first resolves the account through the enterprise identity service, then uses its canonical username for Microsoft Graph correlation. The resulting view combines current account status and timestamps with directory data such as display name, department, and job title.
+
+This joins identity data maintained by separate enterprise systems into one operational view, placing the account's technical state and organizational context alongside the actions available to the analyst.
+
+### Account Lookup and VIP Identification
+
+<p align="center">
+  <img src="imgs/lookup-vip.png" alt="Identity lookup and VIP-aware account details" width="660">
+</p>
+
+### VIP-Aware Security Controls
+
+Protected job titles are defined through application configuration and evaluated using case-insensitive matching against Entra ID job-title data. Accounts matching a protected title receive a prominent VIP warning; missing job-title information is treated as an unverified classification.
+
+The safeguard is enforced **in the Python backend**, not solely through the interface. Immediately before a disable operation, the application resolves the account again, retrieves directory information, and reevaluates VIP classification. Both disable variants require an explicitly non-VIP result before the request can proceed to APIM.
+
+<details>
+<summary><strong>Python — Server-side VIP enforcement</strong></summary>
+
+```python
+if action in ("disable_reset", "disable_no_reset"):
     if vip["is_vip"] is not False:
         return action_response(
-            "Disable blocked: VIP account "
-            "detected or VIP status could "
-            "not be verified. Follow the "
-            "VIP handling procedure.",
+            "Disable blocked: VIP account detected "
+            "or VIP status could not be verified.",
             403,
         )
 ```
 
-The browser's displayed classification is not trusted as the authorization for a disable request. Lookup failures or invalid title configuration also prevent the action from reaching APIM.
-
-This implementation provides classification, warnings, and blocking. It does not implement a VIP approval workflow or an override path.
+The VIP assessment is repeated immediately before the account action, independent of the classification already rendered in the analyst's browser.
 
 </details>
 
-<!-- Future screenshot: /imgs/vip-safeguard.png -->
+---
 
-### 4. Submit a controlled account action
+## Automated Identity Remediation
 
-The backend verifies the CSRF token, validates the username, restricts actions to the supported set, and accepts only `production` or `test` as the ServiceNow target. It selects the APIM URL from server-side configuration.
+Analysts can perform three account-management operations from the same interface:
 
-| Analyst action | JSON action | JSON method | Expected account state |
-| --- | --- | --- | --- |
-| Enable | `Enable` | `PATCH` | `ACTIVE` |
-| Disable with reset | `DisableReset` | `PATCH` | `DISABLED` |
-| Disable without reset | `Disable` | `PATCH` | `DISABLED` |
+| Operation | Workflow action | Verified account state |
+| --- | --- | --- |
+| **Enable account** | `Enable` | `ACTIVE` |
+| **Disable with reset** | `DisableReset` | `DISABLED` |
+| **Disable without reset** | `Disable` | `DISABLED` |
 
-All three application-to-APIM requests use **HTTP POST**, even though their JSON `method` value is `PATCH`. APIM forwards a POST to the Logic App request trigger; the workflow uses the JSON method when calling the identity service.
+The Python backend builds a structured request and sends it to APIM over HTTPS. The gateway applies its policies and forwards the request to the Logic App, which selects the appropriate downstream identity operation.
+
+The application-to-APIM request uses **HTTP POST**, while the JSON `method` property identifies the downstream **`PATCH`** account modification. This distinction is preserved across the application, API gateway, and workflow integration.
 
 <details>
-<summary><strong>View a sanitized account-action payload</strong></summary>
+<summary><strong>API — Account-action request</strong></summary>
 
 ```json
 {
@@ -155,104 +179,111 @@ All three application-to-APIM requests use **HTTP POST**, even though their JSON
 }
 ```
 
-The action names describe the downstream identity-service contract. The implementation of the reset operation itself is outside this repository.
+The available `action` values are `Enable`, `DisableReset`, and `Disable`; the ServiceNow target is independently selected as `production` or `test`.
 
 </details>
 
-### 5. Execute the workflow and route ServiceNow activity
+### Account Remediation and Verification
 
-The Logic App retrieves the identity-service credential from Key Vault, branches on the requested method, and forwards lookup or modification requests to the identity service. It validates supported account actions and returns workflow responses to the caller.
+<p align="center">
+  <img src="imgs/disable.png" alt="Account remediation workflow and verified account state" width="620">
+</p>
 
-For a modification returning HTTP 200, the workflow distinguishes disable actions from enable actions. Disable actions retrieve the ServiceNow credential and submit a catalog request to the selected environment. Enable actions return the identity-service response without creating that catalog request. Other identity-service status codes are passed back through a separate response branch.
+Following a successful API response, the Python application performs a new identity lookup and compares the returned state with the expected result. An HTTP acknowledgment and a verified account change are represented separately, making the authoritative account state the basis of the completion indicator.
 
-> [!IMPORTANT]
-> **ServiceNow Test Mode changes only the ServiceNow target.** It does not simulate, suppress, or roll back the identity-service operation. Account enable and disable requests still execute against the configured identity backend.
-
-Identity changes occur before the ServiceNow request. A later ticketing failure therefore does not prove that the account change failed. The workflow has no cross-service transaction or rollback; analysts must check account state before retrying an uncertain result.
-
-### 6. Verify the resulting account state
-
-After a successful action response, the application checks for supported business-error indicators and performs a fresh account lookup through APIM. It compares the observed status with the expected state for that action.
+<details>
+<summary><strong>Python — Post-action state verification</strong></summary>
 
 ```python
+latest, _ = get_user_status(canonical_username)
 observed_status = str(
     latest.get("status") or "UNKNOWN"
 ).upper()
-expected = action_config["expected_status"]
-verified = observed_status == expected
+
+expected_status = action_config["expected_status"]
+verified = observed_status == expected_status
 ```
 
-The interface distinguishes a successful API response from a verified account state. A mismatched state or failed follow-up lookup is presented as unconfirmed, while API and recognized backend failures are presented as errors.
+The interface reflects whether the resulting state has been confirmed by the identity service.
 
-Verification is a single follow-up lookup, not a polling loop. A delayed backend update may require another lookup. Verification confirms the account status; it does not independently prove password-reset completion or downstream ticket fulfillment.
+</details>
 
-<!-- Future screenshot: /imgs/action-verification.png -->
+## Logic App and ServiceNow Orchestration
+
+**Azure Logic Apps** provides the downstream execution layer for account investigation and remediation. The workflow routes requests by operation, retrieves required secrets from **Azure Key Vault**, invokes the identity backend, processes responses, and coordinates ServiceNow catalog activity for supported disable operations.
+
+The interface exposes a **ServiceNow Test Mode** control to select the service-management destination. This setting changes where the associated ServiceNow activity is directed; it does not change or simulate the underlying identity modification. The separation allows the same identity-response pathway to interact with the appropriate ServiceNow environment.
+
+This orchestration connects a custom Python application with established enterprise identity and IT service-management systems while keeping downstream credentials outside the application source and frontend.
 
 ---
 
-## Security Engineering Decisions
+## Security Architecture
 
-| Control | Implementation and boundary |
+Security controls are applied at multiple boundaries: the browser-to-application request, the application-to-APIM integration, the gateway-to-workflow call, and the workflow's access to downstream systems.
+
+| Area | Engineering implementation |
 | --- | --- |
-| Managed identity | The application uses `ManagedIdentityCredential` for Graph and APIM tokens. APIM policy excerpts obtain a separate managed-identity token for the workflow backend. |
-| Gateway caller validation | The retained product policy requires a configured caller object ID; its validation fragment checks the Entra tenant and token audience. |
-| Subscription-key requirement | The application sends an APIM subscription key in addition to its bearer token. The relevant API/product excerpts require a subscription. |
-| Server-side VIP safeguard | Both disable actions require a freshly evaluated, explicitly non-VIP result. |
-| CSRF protection | Account modifications require a matching cookie/header token; the cookie uses the `__Host-` prefix, Secure, HttpOnly, and SameSite Strict attributes. |
-| Input restrictions | Supported actions and ServiceNow targets are allowlisted on the server. |
-| Configuration separation | APIM URLs, scope, subscription key, protected-title configuration, and lookup-debug setting are read from environment variables. |
-| Credential handling | Workflow credentials come from Key Vault. Secret-fetch actions mark inputs and outputs as secure data. |
-| Diagnostic redaction | Constructed request details replace bearer-token and subscription-key values with redaction markers and omit URL query strings. |
-| Outcome verification | A fresh identity-service lookup checks the expected account status after a successful action response. |
+| **Managed identity** | Azure-managed service identities authenticate the Python application to Microsoft Graph and APIM, and APIM to the workflow backend. |
+| **API policy enforcement** | APIM applies caller validation, subscription requirements, policy-driven routing, and backend authentication. |
+| **Credential protection** | Logic Apps retrieves backend credentials from Azure Key Vault instead of embedding them in source code. |
+| **VIP protection** | Sensitive disable actions require a fresh, explicitly non-VIP assessment in the Python backend. |
+| **Request protection** | Account-action requests use CSRF validation; supported actions and ServiceNow targets are server-validated. |
+| **Configuration separation** | Endpoints and security-relevant application settings are externally configured. |
+| **Diagnostics** | Request inspection redacts bearer tokens and subscription keys. |
+| **Outcome verification** | A follow-up authoritative lookup checks the resulting account status. |
 
-Managed identity authenticates services; it does not establish which human analyst may use the web interface. The included FastAPI routes do not implement operator sign-in or role authorization. App Service authentication settings, Graph permissions, and a complete workflow-trigger access policy are not included, so this writeup does not claim to demonstrate those controls.
+The combination of application-level controls, managed identities, API governance, and downstream workflow isolation supports controlled execution of privileged identity operations across multiple enterprise services.
 
-The code includes operational logging, but it does not demonstrate a complete, attributable analyst audit trail. VIP matching depends on directory data and configured title substrings; it is not a general-purpose authorization system.
+## Operational Visibility
 
-## Diagnostics and Troubleshooting
+The analyst interface includes action progress, execution results, and an expandable **API Request & Response** view. It displays the application-to-APIM HTTP method, sanitized target endpoint, selected action, JSON body, and returned status and response data.
 
-The interface provides expandable details for the application-to-APIM request, including the HTTP method, target URL, payload, and returned result. Lookup diagnostics are controlled by `IDENTITY_DEBUG_UI`; account-action diagnostics are returned independently of that setting.
+### Request and Response Diagnostics
 
-Lookup diagnostics include the upstream status and elapsed time. Action diagnostics include the application response status and an upstream status when an HTTP error is available. They do not expose APIM's internally rewritten request to the Logic App; investigating that hop requires separate gateway tracing.
+<p align="center">
+  <img src="imgs/api%20debug%20details.png" alt="Expandable API request and response diagnostics" width="660">
+</p>
 
-Redaction applies to the constructed authentication fields and URL query strings. Account payloads, backend response bodies, and some logged errors can still contain identity data. These are operational diagnostics, not an automatic sanitizer for screenshots or exported logs.
+The diagnostics expose the relevant application integration details while redacting authentication headers. Together with the post-action account lookup, they make it possible to distinguish an API response from a confirmed change in the enterprise identity system.
 
-<!-- Future screenshot: /imgs/request-diagnostics.png -->
+<details>
+<summary><strong>Python — Redacted request diagnostics</strong></summary>
 
-## Engineering Challenges and Operational Value
+```python
+request_details = {
+    "http_method": "POST",
+    "target_url": safe_url,
+    "endpoint_setting": action_config["url_setting"],
+    "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "[REDACTED]",
+        "Ocp-Apim-Subscription-Key": "[REDACTED]",
+    },
+    "body": payload.copy(),
+}
+```
 
-**Joining identities across systems.** Resolving the canonical username before directory enrichment reduces the chance that an analyst's input is interpreted differently by the account service and Entra ID. Rejecting zero or multiple directory matches keeps uncertainty visible.
+The diagnostic capture documents the outbound Python application request without displaying bearer tokens or APIM subscription secrets.
 
-**Separating transport from operation semantics.** POST is the application-facing transport, while the payload chooses GET or PATCH for the authoritative identity service. Preserving that distinction across the application, gateway, and workflow prevents ambiguous routing and misleading diagnostics.
-
-**Keeping safeguards on the server.** Rechecking VIP status immediately before a disable request prevents a stale page or modified browser request from bypassing the application safeguard.
-
-**Handling partial completion.** Identity changes and ServiceNow requests are separate operations. The UI separates acceptance, verified state, and uncertainty so an analyst has a reason to investigate before submitting another action.
-
-**Separating service responsibilities.** The application handles analyst interaction and safeguards, APIM handles gateway policy and routing, and Logic Apps handles downstream orchestration. That separation keeps backend credentials and workflow implementation out of the browser.
-
-Together, these choices provide a repeatable investigation and response workflow with visible safeguards and outcomes. This repository makes no quantitative claim about response-time savings or deployment scale.
+</details>
 
 ---
 
-## Repository Contents
+## Engineering Highlights
 
-```text
-web-app/
-  main.py                         Lookup, VIP controls, actions, and verification
-  identity_apim.py                 Managed-identity APIM client
-  entra_users.py                  Microsoft Graph enrichment
-  templates/index.html            Analyst interface and client-side interaction
-  templates/styles.css            Interface styling
-  .env.example                    Placeholder configuration reference
-  requirements.txt                Python dependencies
-  startup.sh                      App Service startup script
-logic-apps/
-  identity-response.workflow.json Sanitized workflow definition
-apim/
-  apim.json                       Focused gateway and policy excerpts
-```
+**Custom application development.** A production Python/FastAPI application provides a tailored security operations interface, integrates with external services, enforces business rules, and tracks account action outcomes.
 
-The APIM file intentionally omits unrelated APIs, alternate integrations, subscriptions, administrative groups, network allowlists, and service provisioning metadata. The Logic App file retains the workflow definition while omitting the ARM deployment wrapper, connection bindings, access-key resources, and exported network addresses.
+**Cross-system identity correlation.** Authoritative account lookup and Microsoft Entra ID enrichment are joined through canonical identity resolution to provide consistent context across systems.
 
-Unused client helpers for a separate VIP workflow were removed; the documented web application blocks VIP disable actions. Names and configuration keys are generic throughout the public source. The APIM policy excerpts also normalize an extra XML-escaping layer present in two exported expressions.
+**Layered Azure integration.** App Service, API Management, managed identities, Logic Apps, and Key Vault each serve a distinct responsibility in the request and execution path.
+
+**Privileged workflow safeguards.** VIP status is revalidated server-side before disable operations, while account actions are constrained to supported operations and verified against the authoritative backend afterward.
+
+**Enterprise service-management integration.** Remediation workflows coordinate downstream ServiceNow activity alongside identity changes, with separately selectable production and test ticketing targets.
+
+**Operationally meaningful results.** The interface combines immediate execution feedback with independent account-state verification and inspectable API transactions.
+
+---
+
+**Technology stack:** Python · FastAPI · Jinja2 · JavaScript · Azure App Service · Azure API Management · Azure Logic Apps · Azure Managed Identity · Microsoft Graph · Microsoft Entra ID · Azure Key Vault · ServiceNow

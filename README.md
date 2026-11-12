@@ -4,12 +4,12 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
 ![Microsoft Azure](https://img.shields.io/badge/Microsoft_Azure-0078D4?style=flat&logo=microsoftazure&logoColor=white)
-![Azure Logic Apps](https://img.shields.io/badge/Azure_Logic_Apps-0078D4)
+![Azure Functions](https://img.shields.io/badge/Azure_Functions-0062AD)
 ![Microsoft Entra ID](https://img.shields.io/badge/Microsoft_Entra_ID-5E5E5E)
 
-**A production Python-based identity security and incident response platform integrating Azure App Service, Azure API Management, Azure Logic Apps, Microsoft Entra ID, and ServiceNow.**
+**A production Python-based identity security and incident response platform integrating Azure App Service, Azure API Management, Azure Functions, Microsoft Entra ID, and ServiceNow.**
 
-Developed for security operations within a large enterprise, the platform unifies identity investigation, directory enrichment, VIP-aware account protections, automated remediation, and outcome verification in a single analyst interface. Its architecture connects a custom Python application to enterprise identity infrastructure through managed identities, a policy-controlled API gateway, and cloud-hosted orchestration.
+Developed for security operations within a large enterprise, the platform unifies identity investigation, directory enrichment, VIP-aware account protections, automated remediation, and outcome verification in a single analyst interface. Its architecture connects a custom Python application to enterprise identity infrastructure through managed identities, a policy-controlled API gateway, and Python-based serverless execution.
 
 ## Platform Capabilities
 
@@ -19,22 +19,22 @@ Developed for security operations within a large enterprise, the platform unifie
 | **Directory intelligence** | Microsoft Graph enrichment with Microsoft Entra ID display name, department, and job title |
 | **Account remediation** | Enable, disable with reset, and disable without reset operations |
 | **Protected-account safeguards** | Configurable VIP detection with server-side revalidation and blocking of protected disable operations |
-| **Enterprise workflow integration** | Logic Apps orchestration, Azure Key Vault credential retrieval, and ServiceNow catalog activity |
+| **Enterprise workflow integration** | Azure Functions execution, Azure Key Vault credential retrieval, and ServiceNow catalog activity |
 | **Response assurance** | Follow-up account-state verification, live execution feedback, and expandable API diagnostics |
 
 ## Enterprise Architecture
 
-The platform separates the analyst experience, application business logic, directory enrichment, API policy enforcement, workflow execution, and downstream account management. Python coordinates these services without placing identity-service credentials or Logic App endpoints in the browser.
+The platform separates the analyst experience, application business logic, directory enrichment, API policy enforcement, serverless function execution, and downstream account management. Python coordinates these services without placing identity-service credentials or Function App endpoints in the browser.
 
 ```mermaid
 flowchart TD
     Analyst[Security Analyst] -->|Investigate and respond| App[Python / FastAPI / Jinja2<br/>Azure App Service]
     App -->|Managed identity / Microsoft Graph| Entra[Microsoft Entra ID]
     App -->|HTTPS / Bearer token / Subscription key| APIM[Azure API Management]
-    APIM -->|Policy validation / Managed identity| Logic[Azure Logic Apps]
-    Logic -->|Retrieve credentials| Vault[Azure Key Vault]
-    Logic -->|Identity lookup / account modification| Identity[Enterprise Identity Service]
-    Logic -->|Disable-related catalog workflow| SN[ServiceNow]
+    APIM -->|Policy validation / Managed identity| Functions[Python Azure Function App]
+    Functions -->|Retrieve credentials| Vault[Azure Key Vault]
+    Functions -->|Identity lookup / account modification| Identity[Enterprise Identity Service]
+    Functions -->|Disable-related catalog request| SN[ServiceNow]
     APIM -->|Account response| App
 ```
 
@@ -42,9 +42,9 @@ flowchart TD
 
 **Microsoft Entra ID — Organizational identity context.** Microsoft Graph supplies directory attributes associated with the canonical enterprise account, allowing the application to present organizational context and evaluate protected job titles.
 
-**Azure API Management — Governed integration boundary.** APIM mediates application requests, applies gateway validation and subscription requirements, and authenticates to the downstream workflow with managed identity. APIM's broader architecture and policy design are documented separately.
+**Azure API Management — Governed integration boundary.** APIM mediates application requests, applies gateway validation and subscription requirements, and authenticates to the downstream Function App with managed identity. APIM's broader architecture and policy design are documented separately.
 
-**Azure Logic Apps — Workflow execution.** Logic Apps handles request branching, Key Vault credential retrieval, enterprise identity operations, structured responses, and associated ServiceNow activity.
+**Azure Functions — Serverless execution.** Python HTTP-triggered functions validate incoming requests, retrieve credentials from Key Vault using managed identity, call the enterprise identity API, and return structured responses. For supported disable operations, the function also submits the associated ServiceNow catalog request.
 
 **Enterprise identity service and ServiceNow — Operational systems.** The identity service supplies authoritative account state and performs account modifications. ServiceNow receives catalog activity associated with supported disable operations.
 
@@ -52,7 +52,7 @@ flowchart TD
 
 ## Python Application Engineering
 
-The application is built with **Python and FastAPI**, with separate modules for APIM communication and Microsoft Graph queries. Rather than delegating all decisions to the automation workflow, the Python backend owns the account investigation flow, business-rule enforcement, action dispatch, and post-action verification.
+The application is built with **Python and FastAPI**, with separate modules for APIM communication and Microsoft Graph queries. Rather than delegating all decisions to the downstream function, the Python backend owns the account investigation flow, business-rule enforcement, action dispatch, and post-action verification.
 
 The backend resolves a canonical account identifier before performing Entra enrichment, validates account-action requests on the server, and independently checks VIP status before sensitive disable actions. Its HTTP integration layer obtains managed-identity tokens and submits JSON requests to configured APIM endpoints; responses are evaluated before the interface reports an operation as verified.
 
@@ -161,9 +161,9 @@ Analysts can perform three account-management operations from the same interface
 | **Disable with reset** | `DisableReset` | `DISABLED` |
 | **Disable without reset** | `Disable` | `DISABLED` |
 
-The Python backend builds a structured request and sends it to APIM over HTTPS. The gateway applies its policies and forwards the request to the Logic App, which selects the appropriate downstream identity operation.
+The Python backend builds a structured request and sends it to APIM over HTTPS. The gateway applies its policies and forwards the request to the Python Azure Function, which validates the payload and executes the requested downstream identity operation.
 
-The application-to-APIM request uses **HTTP POST**, while the JSON `method` property identifies the downstream **`PATCH`** account modification. This distinction is preserved across the application, API gateway, and workflow integration.
+The application-to-APIM request uses **HTTP POST**, while the JSON `method` property identifies the downstream **`PATCH`** account modification. This distinction is preserved across the application, API gateway, and Function App integration.
 
 <details>
 <summary><strong>API — Account-action request</strong></summary>
@@ -208,25 +208,25 @@ The interface reflects whether the resulting state has been confirmed by the ide
 
 </details>
 
-## Logic App and ServiceNow Orchestration
+## Azure Functions and ServiceNow Integration
 
-**Azure Logic Apps** provides the downstream execution layer for account investigation and remediation. The workflow routes requests by operation, retrieves required secrets from **Azure Key Vault**, invokes the identity backend, processes responses, and coordinates ServiceNow catalog activity for supported disable operations.
+**Azure Functions** provides the downstream execution layer for account investigation and remediation. An HTTP-triggered Python function validates the request, retrieves required secrets from **Azure Key Vault**, and queries the authoritative identity backend. For account modifications, the function performs the requested PATCH operation and returns the resulting response. Successful supported disable operations additionally trigger a ServiceNow catalog request. The integration reports errors with stage identifiers and diagnostic IDs, including partial-success information when the identity change succeeds but ServiceNow activity fails.
 
 The interface exposes a **ServiceNow Test Mode** control to select the service-management destination. This setting changes where the associated ServiceNow activity is directed; it does not change or simulate the underlying identity modification. The separation allows the same identity-response pathway to interact with the appropriate ServiceNow environment.
 
-This orchestration connects a custom Python application with established enterprise identity and IT service-management systems while keeping downstream credentials outside the application source and frontend.
+This serverless integration connects a custom Python application with established enterprise identity and IT service-management systems while keeping downstream credentials outside the application source and frontend.
 
 ---
 
 ## Security Architecture
 
-Security controls are applied at multiple boundaries: the browser-to-application request, the application-to-APIM integration, the gateway-to-workflow call, and the workflow's access to downstream systems.
+Security controls are applied at multiple boundaries: the browser-to-application request, the application-to-APIM integration, the gateway-to-Function-App call, and the function's access to downstream systems.
 
 | Area | Engineering implementation |
 | --- | --- |
-| **Managed identity** | Azure-managed service identities authenticate the Python application to Microsoft Graph and APIM, and APIM to the workflow backend. |
+| **Managed identity** | Azure-managed service identities authenticate the Python application to Microsoft Graph and APIM, and APIM to the Function App backend. |
 | **API policy enforcement** | APIM applies caller validation, subscription requirements, policy-driven routing, and backend authentication. |
-| **Credential protection** | Logic Apps retrieves backend credentials from Azure Key Vault instead of embedding them in source code. |
+| **Credential protection** | The Python Function App retrieves backend credentials from Azure Key Vault using its managed identity instead of embedding them in source code. |
 | **VIP protection** | Sensitive disable actions require a fresh, explicitly non-VIP assessment in the Python backend. |
 | **Request protection** | Account-action requests use CSRF validation; supported actions and ServiceNow targets are server-validated. |
 | **Configuration separation** | Endpoints and security-relevant application settings are externally configured. |
@@ -276,14 +276,14 @@ The diagnostic capture documents the outbound Python application request without
 
 **Cross-system identity correlation.** Authoritative account lookup and Microsoft Entra ID enrichment are joined through canonical identity resolution to provide consistent context across systems.
 
-**Layered Azure integration.** App Service, API Management, managed identities, Logic Apps, and Key Vault each serve a distinct responsibility in the request and execution path.
+**Layered Azure integration.** App Service, API Management, managed identities, Azure Functions, and Key Vault each serve a distinct responsibility in the request and execution path.
 
 **Privileged workflow safeguards.** VIP status is revalidated server-side before disable operations, while account actions are constrained to supported operations and verified against the authoritative backend afterward.
 
-**Enterprise service-management integration.** Remediation workflows coordinate downstream ServiceNow activity alongside identity changes, with separately selectable production and test ticketing targets.
+**Enterprise service-management integration.** Function-based remediation coordinates downstream ServiceNow activity alongside identity changes, with separately selectable production and test ticketing targets.
 
 **Operationally meaningful results.** The interface combines immediate execution feedback with independent account-state verification and inspectable API transactions.
 
 ---
 
-**Technology stack:** Python · FastAPI · Jinja2 · JavaScript · Azure App Service · Azure API Management · Azure Logic Apps · Azure Managed Identity · Microsoft Graph · Microsoft Entra ID · Azure Key Vault · ServiceNow
+**Technology stack:** Python · FastAPI · Jinja2 · JavaScript · Azure App Service · Azure API Management · Azure Functions · Azure Managed Identity · Microsoft Graph · Microsoft Entra ID · Azure Key Vault · ServiceNow
